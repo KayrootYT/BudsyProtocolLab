@@ -5,6 +5,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - 'BudsyProtocolLab_with_workflow.zip'
       - 'BudsyProtocolLab/**'
       - '.github/workflows/android.yml'
 
