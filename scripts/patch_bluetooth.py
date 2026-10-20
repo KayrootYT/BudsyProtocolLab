@@ -7,7 +7,7 @@ if "scanResults = new LinkedHashMap" in s:
     raise SystemExit(0)
 s = s.replace("import android.bluetooth.le.ScanResult;", "import android.bluetooth.le.ScanResult;\nimport android.bluetooth.le.ScanSettings;")
 s = s.replace("import java.util.HashMap;", "import java.util.HashMap;\nimport java.util.LinkedHashMap;\nimport java.util.Collections;")
-s = s.replace("    private final Map<String, BluetoothDevice> found = new HashMap<>();", "    private final Map<String, BluetoothDevice> found = new LinkedHashMap<>();\n    private final Map<String, ScanResult> scanResults = new LinkedHashMap<>();\n    private final Runnable stopScanTask = this::stopScan;\n    private boolean pendingScan = false;")
+s = s.replace("    private final Map<String, BluetoothDevice> found = new HashMap<>();", "    private final Map<String, BluetoothDevice> found = new LinkedHashMap<>();\n    private final Map<String, ScanResult> scanResults = new LinkedHashMap<>();\n    private final Map<String, BluetoothDevice> bondedDevices = new LinkedHashMap<>();\n    private final Runnable stopScanTask = this::stopScan;\n    private boolean pendingScan = false;")
 start = s.index("    private void requestBtPermissions() {")
 end = s.index("    private final BluetoothGattCallback gattCallback", start)
 replacement = '''    private boolean hasBtPermissions() {
@@ -39,8 +39,11 @@ replacement = '''    private boolean hasBtPermissions() {
             scanner=adapter.getBluetoothLeScanner();
             if(scanner==null){toast("BLE scanner unavailable. Check Bluetooth is enabled.");return;}
             if(scanning) { try { scanner.stopScan(scanCallback); } catch(Exception ignored) {} }
-            found.clear(); scanResults.clear(); deviceList.removeAllViews();
-            deviceList.addView(text("Scanning… all BLE devices are shown, including unnamed devices.",12,muted));
+            found.clear(); scanResults.clear(); bondedDevices.clear();
+            try { for(BluetoothDevice paired:adapter.getBondedDevices()) bondedDevices.put(paired.getAddress(),paired); } catch(SecurityException ignored) {}
+            deviceList.removeAllViews();
+            deviceList.addView(text("Scanning… paired devices and all BLE advertisements are shown.",12,muted));
+            renderDevices();
             ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES).build();
             scanner.startScan(null,settings,scanCallback);
             scanning=true; status.setText("Scanning nearby BLE devices… keep the buds case open");
@@ -60,7 +63,7 @@ replacement = '''    private boolean hasBtPermissions() {
     }
     private void renderDevices() {
         deviceList.removeAllViews();
-        if(scanResults.isEmpty()) { deviceList.addView(text("No BLE advertisements received yet. Keep the buds case open, wake the earbuds, and scan again. If connected to another phone/app, disconnect it first.",12,muted)); return; }
+        if(scanResults.isEmpty() && bondedDevices.isEmpty()) { deviceList.addView(text("No BLE advertisements received yet. Keep the buds case open, wake the earbuds, and scan again. If connected to another phone/app, disconnect it first.",12,muted)); return; }
         ArrayList<ScanResult> results = new ArrayList<>(scanResults.values());
         Collections.sort(results, (a,b) -> Integer.compare(b.getRssi(),a.getRssi()));
         for(ScanResult result:results) {
@@ -76,6 +79,15 @@ replacement = '''    private boolean hasBtPermissions() {
             Button connect=button("Connect GATT"); connect.setOnClickListener(v->connect(d,shown)); card.addView(connect);
             deviceList.addView(card);
         }
+        for(BluetoothDevice d:bondedDevices.values()) {
+            String key=d.getAddress(); if(scanResults.containsKey(key)) continue;
+            String deviceName="Paired Bluetooth device"; try { if(d.getName()!=null && !d.getName().trim().isEmpty()) deviceName=d.getName().trim(); } catch(SecurityException ignored) {}
+            final String name=deviceName; boolean candidate=looksLikeOnePlusBuds(name);
+            LinearLayout card=card(); LinearLayout info=new LinearLayout(this); info.setOrientation(LinearLayout.VERTICAL);
+            TextView nameView=text(name,15,white); nameView.setTypeface(null,1); info.addView(nameView);
+            info.addView(text((candidate?"Possible OnePlus earbuds · ":"")+"Paired · not currently advertising · "+key,12,candidate?orange:muted));
+            card.addView(info); Button connect=button("Connect GATT"); connect.setOnClickListener(v->connect(d,name)); card.addView(connect); deviceList.addView(card);
+        }
     }
     private final ScanCallback scanCallback = new ScanCallback() {
         @Override public void onScanResult(int callbackType, ScanResult result) { runOnUiThread(() -> { String key=result.getDevice().getAddress(); found.put(key,result.getDevice()); scanResults.put(key,result); renderDevices(); }); }
@@ -84,7 +96,7 @@ replacement = '''    private boolean hasBtPermissions() {
     };
     private void stopScan() {
         handler.removeCallbacks(stopScanTask);
-        if(scanner!=null && scanning){try{scanner.stopScan(scanCallback);}catch(Exception ignored){} scanning=false; addLog("SCAN_STOP","","","stopped; devices="+scanResults.size()); if(gatt==null) status.setText(scanResults.isEmpty()?"No BLE devices found · retry with buds case open":"Scan stopped · select a device");}
+        if(scanner!=null && scanning){try{scanner.stopScan(scanCallback);}catch(Exception ignored){} scanning=false; addLog("SCAN_STOP","","","stopped; devices="+scanResults.size()); if(gatt==null) status.setText(scanResults.isEmpty() && bondedDevices.isEmpty()?"No BLE devices found · retry with buds case open":"Scan stopped · select a device");}
     }
     private void connect(BluetoothDevice device,String name) {
         stopScan();
