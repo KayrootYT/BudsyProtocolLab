@@ -1,0 +1,1 @@
+Build marker: include observed TX/RX protocol presets and app version 0.3.0.
