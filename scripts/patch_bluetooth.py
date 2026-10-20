@@ -116,4 +116,6 @@ if old not in s:
     raise SystemExit("Could not find expected GATT callback text; refusing to create partial patch")
 s = s.replace(old,new)
 source.write_text(s, encoding="utf-8")
-print("Applied OnePlus Buds BLE discovery/connect patch")
+import runpy
+runpy.run_path("scripts/add_protocol_presets.py")
+print("Applied OnePlus Buds BLE discovery/connect and protocol presets")
