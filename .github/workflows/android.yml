@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'BudsyProtocolLab_with_workflow.zip'
+      - 'BudsyProtocolLab.zip'
       - 'BudsyProtocolLab/**'
       - '.github/workflows/android.yml'
 
@@ -21,8 +22,17 @@ jobs:
 
       - name: Extract uploaded project ZIP
         run: |
-          test -f BudsyProtocolLab_with_workflow.zip
-          unzip -o BudsyProtocolLab_with_workflow.zip -d .
+          if [ -f BudsyProtocolLab_with_workflow.zip ]; then
+            ZIP_FILE="BudsyProtocolLab_with_workflow.zip"
+          elif [ -f BudsyProtocolLab.zip ]; then
+            ZIP_FILE="BudsyProtocolLab.zip"
+          else
+            echo "No project ZIP found in repository root."
+            ls -la
+            exit 1
+          fi
+          echo "Using $ZIP_FILE"
+          unzip -o "$ZIP_FILE" -d .
           test -f BudsyProtocolLab/settings.gradle
 
       - name: Set up Java 17
