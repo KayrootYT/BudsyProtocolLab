@@ -26,4 +26,7 @@ methods=r'''    private void buildProtocolCommands() {
 if marker not in s: raise SystemExit("method insertion point missing")
 s=s.replace(marker,methods+marker)
 p.write_text(s,encoding="utf-8")
+g=Path("BudsyProtocolLab/app/build.gradle")
+t=g.read_text(encoding="utf-8").replace("versionCode 2","versionCode 3").replace("versionName '0.2.0'","versionName '0.3.0'")
+g.write_text(t,encoding="utf-8")
 print("Protocol presets added")
